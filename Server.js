@@ -4,9 +4,17 @@ const port = 3000;
 const database = require("./src/config/database");
 require("dotenv").config();
 const cors = require("cors");
-
-const whitelist = ["http://localhost:3000", "http://localhost:5173"];
-
+const { initWebSocket } = require("./src/config/websocket");
+const whitelist = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  // cảu mobile bên dưới
+  "http://192.168.1.20",
+  "http://192.168.1.20:8081", // Expo web
+  "http://192.168.1.20:19000", // Expo Go (port ngẫu nhiên)
+];
+const http = require("http");
+const server = http.createServer(app);
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin || whitelist.includes(origin)) {
@@ -40,6 +48,7 @@ userRouterCheck(app);
 librarianRouterNotCheck(app);
 librarianRouterCheck(app);
 database.connect();
-app.listen(port, () => {
+initWebSocket(server);
+server.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });

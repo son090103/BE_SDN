@@ -11,6 +11,9 @@ const UserTable = require("../../model/User_table");
 const mongoose = require("mongoose");
 const userao = require("./../../model/User_Ao");
 const UserBook = require("./../../model/User_book");
+const Message = require("./../../model/Messages");
+const Conversation = require("./../../model/Conversation");
+const { sendToUser } = require("../../config/websocket");
 //login thủ thư
 module.exports.login = async (req, res) => {
   console.log("đang chạy vào login");
@@ -803,4 +806,69 @@ module.exports.bookforusser = async (req, res) => {
   book.quantity -= Number(quantity);
   await book.save();
   res.status(201).json({ message: "Tạo người mượn thành công!" });
+};
+
+// nhắn tin
+module.exports.getAllConversations = async (req, res) => {
+  console.log("chạy vào getAllConversation");
+  try {
+    const conversation = await Conversation.find()
+      .populate("user_id", "fullname avatar")
+      .populate()
+      .sort({ lastMessagesTime: -1 });
+    if (!conversation) {
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy cuộc hội thoại." });
+    }
+    console.log("cuộc trog chuyện là : ", conversation);
+    res.status(200).json({
+      message: "Lấy danh sách cuộc hội thoại thành công.",
+      data: conversation,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Gửi tin nhắn
+
+// Lấy tất cả cuộc hội thoại
+module.exports.sendMessage = async (req, res) => {
+  console.log("chạy vào gửi tin nhắn");
+  try {
+    const senderIdInput = res.locals.user.id;
+    const { userIdInput } = req.params;
+    const { contentInput } = req.body;
+    const message = new Message({
+      sender_id: senderIdInput,
+      receiver_id: userIdInput,
+      content: contentInput,
+      read: false,
+    });
+    await message.save();
+    sendToUser(userIdInput, {
+      type: "new_message",
+      data: message,
+    });
+    res.status(200).json({ message: "Gửi tin nhắn thành công", data: message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Lấy tin nhắn
+module.exports.getMessageHistory = async (req, res) => {
+  try {
+    const senderIdInput = res.locals.user.id;
+    //const {senderIdInput} = req.body; // Dùng body để test trước
+    const { userIdInput } = req.params;
+    const messages = await Message.find({
+      $or: [
+        { sender_id: senderIdInput, receiver_id: userIdInput },
+        { sender_id: userIdInput, receiver_id: senderIdInput },
+      ],
+    }).sort({ createdAt: 1 });
+    res.status(200).json({ message: "Lịch sử tin nhắn", data: messages });
+  } catch (error) {}
 };

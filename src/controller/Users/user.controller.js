@@ -12,6 +12,9 @@ const Table = require("../../model/Table");
 const User_table = require("../../model/User_table");
 const FaouriteBook = require("../../model/FaouriteBook");
 const cloudinary = require("../../config/cloudinary");
+
+const Message = require("../../model/Messages");
+const Conversation = require("../../model/Conversation");
 // lưu ý payload có thể là algorithm (default: HS256) hoặc expiresInMinutes
 module.exports.login = async (req, res) => {
   console.log("chạy vào login của user");
@@ -165,6 +168,7 @@ const { v4: uuidv4 } = require("uuid");
 let crypto = require("crypto");
 const moment = require("moment");
 const os = require("os");
+const { sendToUser } = require("../../config/websocket");
 module.exports.borrowBookFunction = async (req, res) => {
   console.log("📚 Chạy vào borrowBookFunction");
 
@@ -795,4 +799,162 @@ module.exports.refersh_token = async (req, res) => {
     }
   }
   res.status(response.state).json(response);
+};
+
+// gửi tin nhắn
+module.exports.sendMessage = async (req, res) => {
+  try {
+    console.log("chạy vào gửi tin nhắn ");
+    const senderIdInput = res.locals.user.id;
+    //const {senderIdInput} = req.body;
+    const { contentInput } = req.body; // Dùng body để test trước
+    const librarian = await user.findOne({
+      _id: "68eb4a6c178e15c0cb07d10e",
+      status: "active",
+    });
+    console.log("thử là : ", librarian);
+    if (!librarian) {
+      return res.status(404).json({ message: "Không tìm thấy thủ thư" });
+    }
+    const message = new Message({
+      sender_id: senderIdInput,
+      receiver_id: librarian._id,
+      content: contentInput,
+      read: false,
+    });
+    await message.save();
+    console.log("gửi thành công");
+    sendToUser(librarian._id, {
+      type: "new_message",
+      data: message,
+    });
+    console.log("tin nhắn là : ", sendToUser);
+    const conversation = await Conversation.findOne({
+      librarian_id: librarian._id,
+      user_id: senderIdInput,
+    });
+    console.log("conversation là : ", conversation);
+    if (!conversation) {
+      const newConversation = new Conversation({
+        librarian_id: librarian._id,
+        user_id: senderIdInput,
+        lastMessages: contentInput,
+        lastMessagesTime: new Date(),
+      });
+      await newConversation.save();
+    } else {
+      conversation.lastMessages = contentInput;
+      conversation.lastMessagesTime = new Date();
+      await conversation.save();
+    }
+    res.status(200).json({ message: "Gửi tin nhắn thành công", data: message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports.getMessageHistory = async (req, res) => {
+  console.log("chay vào history của người dùng");
+  try {
+    // const { senderIdInput } = res.locals.user.id;
+    const senderIdInput = res.locals.user.id;
+    const mongoose = require("mongoose");
+    const librarian = await user.findOne({
+      _id: new mongoose.Types.ObjectId("68eb4a6c178e15c0cb07d10e"),
+      status: "active",
+    });
+    if (!librarian) {
+      return res.status(404).json({ message: "Không tìm thấy thủ thư" });
+    }
+    const messages = await Message.find({
+      $or: [
+        { sender_id: senderIdInput, receiver_id: librarian._id },
+        { sender_id: librarian._id, receiver_id: senderIdInput },
+      ],
+    }).sort({ createdAt: 1 });
+    console.log("message là : ", messages);
+    res.status(200).json({ message: "Lịch sử tin nhắn", data: messages });
+  } catch (error) {}
+};
+
+module.exports.getOrderBooks = async (req, res) => {
+  try {
+    const userId = res.locals.user._id;
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 10, 1),
+      100
+    );
+    const skip = (page - 1) * limit;
+
+    const filter = { user_id: userId, deleted: false, status: "active" };
+    const total = await require("../../model/User_book").countDocuments(filter);
+
+    const orders = await require("../../model/User_book")
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate({
+        path: "book_id",
+        select: "title image authors price quantity slug published_year",
+        populate: { path: "authors", select: "name" },
+      })
+      .lean();
+
+    return res.status(200).json({
+      message: "Thành công",
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data: orders,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+//get order table
+module.exports.getOrderTables = async (req, res) => {
+  try {
+    const userId = res.locals.user._id;
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 10, 1),
+      100
+    );
+    const skip = (page - 1) * limit;
+
+    const filter = { user_id: userId, deleted: false, status: "active" };
+    const total = await require("../../model/User_table").countDocuments(
+      filter
+    );
+
+    const orders = await require("../../model/User_table")
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate({
+        path: "table_id",
+        select: "title price status",
+      })
+      .populate({
+        path: "time_slot",
+        select: "start_time end_time",
+      })
+      .lean();
+
+    return res.status(200).json({
+      message: "Thành công",
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data: orders,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };

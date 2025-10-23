@@ -39,4 +39,18 @@ routerLibCheck.get("/category", LibrarianController.getauthor);
 routerLibCheck.get("/getauthor", LibrarianController.getcategory);
 routerLibCheck.get("/orders/books", LibrarianController.listBookOrders);
 routerLibCheck.get("/orders/tables", LibrarianController.listTableOrders);
+
+// nhắn tin
+routerLibCheck.get(
+  "/getAllConversations",
+  LibrarianController.getAllConversations
+);
+routerLibCheck.post(
+  "/sendMessages/:userIdInput",
+  LibrarianController.sendMessage
+);
+routerLibCheck.get(
+  "/messageHistories/:userIdInput",
+  LibrarianController.getMessageHistory
+);
 module.exports = routerLibCheck;
