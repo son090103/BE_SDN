@@ -88,17 +88,32 @@ module.exports.getProfile = async (req, res) => {
   res.status(response.status).json(response);
 };
 // Hàm lấy tất cả users
+const Role = require("./../../model/Role");
 module.exports.GetAllUsers = async (req, res) => {
   try {
-    const user = await User.find();
-    if (!user) {
-      return res.status(404).json({ message: "user not found" });
+    // Tìm role 'admin'
+    const role = await Role.findOne({ title: "admin" });
+    console.log("role là : ", role._id.toString());
+    if (!role) {
+      return res.status(404).json({ message: "Admin role not found" });
     }
-    res.status(200).json(user);
+    // Lấy tất cả us1er không có role admin
+    const users = await User.find({
+      role_id: { $ne: role._id.toString() },
+    });
+
+    // Kiểm tra nếu không có user nào
+    if (users.length === 0) {
+      return res.status(404).json({ message: "No users found" });
+    }
+
+    // Trả kết quả
+    res.status(200).json(users);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
 // Hàm lấy tổng số người dùng
 module.exports.GetTotalUser = async (req, res) => {
   try {
@@ -206,6 +221,30 @@ module.exports.GetTotalRevenue = async (req, res) => {
     }
     total = totalUserBook + totalUserTable;
     return res.status(200).json(total);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports.BanUsers = async (req, res) => {
+  console.log("chạy vào ban admin");
+  try {
+    const { userId } = req.params;
+    const users = await User.findByIdAndUpdate(userId, { status: "inactive" });
+
+    res.status(200).json({ message: "Ban người dùng thành công" }, users);
+  } catch (error) {
+    console.log("chạy vào catch ban ");
+    res.status(500).json({ message: error.message });
+  }
+};
+// Hàm ban Users
+module.exports.UnBanUsers = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const users = await User.findByIdAndUpdate(userId, { status: "active" });
+
+    res.status(200).json({ message: "UnBan người dùng thành công" }, users);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
