@@ -9,9 +9,9 @@ const whitelist = [
   "http://localhost:3000",
   "http://localhost:5173",
   // cảu mobile bên dưới
-  "http://192.168.1.20",
-  "http://192.168.1.20:8081", // Expo web
-  "http://192.168.1.20:19000", // Expo Go (port ngẫu nhiên)
+  "http://192.168.0.16",
+  "http://192.168.0.16:8081", // Expo web
+  "http://192.168.0.16:19000", // Expo Go (port ngẫu nhiên)
 ];
 const http = require("http");
 const server = http.createServer(app);
@@ -38,6 +38,7 @@ const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 const adminRouterNotCheck = require("./src/router/Admin/index.notcheck.routes");
+const adminRouterCheck = require("./src/router/Admin/index.check.routes");
 const userRouterNotCheck = require("./src/router/users/index.notcheck.routes");
 const userRouterCheck = require("./src/router/users/index.check.routes");
 const librarianRouterCheck = require("./src/router/Librarian/index.check.routes");
@@ -47,6 +48,7 @@ adminRouterNotCheck(app);
 userRouterCheck(app);
 librarianRouterNotCheck(app);
 librarianRouterCheck(app);
+adminRouterCheck(app);
 database.connect();
 initWebSocket(server);
 server.listen(port, () => {

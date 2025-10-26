@@ -4,15 +4,11 @@ const reviewbookSchema = new mongoose.Schema(
     user_id: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
     book_id: { type: mongoose.Schema.Types.ObjectId, ref: "books" },
     text: String,
-    deleted: {
-      type: Boolean,
-      default: false,
-    },
+    rating: { type: Number, required: true },
+    deleted: { type: Boolean, default: false },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-const FaouriteBook = mongoose.model("reviewbooks", reviewbookSchema);
-module.exports = FaouriteBook;
+const ReviewBook = mongoose.model("reviewbooks", reviewbookSchema);
+module.exports = ReviewBook;

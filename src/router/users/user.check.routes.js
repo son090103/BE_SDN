@@ -26,5 +26,18 @@ routerUserCheck.delete(
 );
 routerUserCheck.get("/orderbook", userController.getOrderBooks);
 routerUserCheck.get("/ordertable", userController.getOrderTables);
+routerUserCheck.post("/reviewBook", userController.addReviewBook);
+routerUserCheck.put("/reviewBook", userController.editReviewBook);
+routerUserCheck.delete(
+  "/reviewBookdelete/:reviewId",
+  userController.deleteReviewBook
+);
+//
+routerUserCheck.post("/:reviewId/reply", userController.postreviewReply);
+// Lấy danh sách phản hồi theo review
+routerUserCheck.get("/:reviewreplyId", userController.getRepliesByReview);
 
+// Xóa phản hồi
+routerUserCheck.delete("/:id", userController.deleteReply);
+routerUserCheck.post("/logout", userController.getLogout);
 module.exports = routerUserCheck;

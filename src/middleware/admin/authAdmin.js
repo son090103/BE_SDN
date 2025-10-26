@@ -1,6 +1,7 @@
 const user = require("./../../model/User");
 const jwt = require("jsonwebtoken");
 module.exports.checkaccountAdmin = async (req, res, next) => {
+  console.log("chạy vào middle cảu admin");
   const response = {};
   const authorizationHeader = req.get("Authorization");
   const token = authorizationHeader && authorizationHeader?.split(" ")[1];
@@ -15,7 +16,7 @@ module.exports.checkaccountAdmin = async (req, res, next) => {
       if (decode.roleId != "68204adb9bd5898e0b648bd4") {
         return res
           .status(401)
-          .json({ message: " authorization denied , no Chuyengia" });
+          .json({ message: " authorization denied , no ADmin" });
       }
       const users = await user
         .findOne({ _id: decode.userId })

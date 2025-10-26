@@ -94,6 +94,7 @@ module.exports.login = async (req, res) => {
 
 // profile
 module.exports.getProfile = async (req, res) => {
+  console.log("chạy vào profile của libarian");
   const response = {
     status: 200,
     message: "Success",

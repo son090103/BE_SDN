@@ -19,6 +19,7 @@ const Conversation = require("../../model/Conversation");
 module.exports.login = async (req, res) => {
   console.log("chạy vào login của user");
   const { email, password } = req.body;
+  console.log("email , password ", email, password);
   const response = {};
   if (!email || !password) {
     Object.assign(response, {
@@ -89,6 +90,7 @@ module.exports.login = async (req, res) => {
 };
 //đăng ký
 module.exports.register = async (req, res) => {
+  console.log("chạy vào register");
   try {
     var { fullname, email, password, phone, role_id } = req.body;
     const existingUser = await user.findOne({ email });
@@ -96,17 +98,19 @@ module.exports.register = async (req, res) => {
       return res.status(400).json({ message: "Email already exists" });
     }
     password = bcrypt.hashSync(password, 10);
+    if (!req.body.avatar) {
+      var avatar = (req.body.avatar =
+        "https://res.cloudinary.com/dmdogr8na/image/upload/v1746949468/hnrnjeaoymnbudrzs7v9.jpg");
+    }
     const newUser = new user({
       fullname,
       email,
       password,
       phone,
       role_id: role_id || null,
+      avatar,
     });
-    if (!req.body.avatar) {
-      req.body.avatar =
-        "https://res.cloudinary.com/dmdogr8na/image/upload/v1746949468/hnrnjeaoymnbudrzs7v9.jpg";
-    }
+    console.log("đăng ký thành công");
     await newUser.save();
     return res.status(201).json({
       message: "User registered successfully",
@@ -773,7 +777,7 @@ module.exports.refersh_token = async (req, res) => {
     try {
       jwt.verify(refresh_token, process.env.JWT_SECRET); // tạo ra decode
       const users = await user.findOne({ refresh_token: refresh_token });
-      if (!user) {
+      if (!users) {
         throw new Error("User not exist");
       }
       // tạo access token mới
@@ -956,5 +960,185 @@ module.exports.getOrderTables = async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
+  }
+};
+const ReviewBook = require("./../../model/Review_book");
+module.exports.addReviewBook = async (req, res) => {
+  console.log("đang chạy vào thêm review ");
+  try {
+    const userId = res.locals.user._id;
+    const { bookId, text, rating } = req.body;
+    if (!bookId || !text || typeof rating !== "number") {
+      return res.status(400).json({ message: "Thiếu thông tin đánh giá" });
+    }
+    const review = new ReviewBook({
+      user_id: userId,
+      book_id: bookId,
+      text,
+      rating,
+    });
+    await review.save();
+    // Populate user info khi trả về
+    const populatedReview = await ReviewBook.findById(review._id).populate({
+      path: "user_id",
+      select: "fullname avatar _id",
+    });
+    return res
+      .status(201)
+      .json({ message: "Đánh giá thành công", data: populatedReview });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// Lấy review theo book
+
+module.exports.getReviewBooks = async (req, res) => {
+  try {
+    const { bookId, page = 1, limit = 5 } = req.query;
+    if (!bookId) return res.status(400).json({ message: "Thiếu bookId" });
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const total = await ReviewBook.countDocuments({
+      book_id: bookId,
+      deleted: false,
+    });
+    const reviews = await ReviewBook.find({ book_id: bookId, deleted: false })
+      .populate({ path: "user_id", select: "fullname avatar _id" })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    res.json({
+      data: reviews,
+      totalPages: Math.ceil(total / Number(limit)),
+      total,
+      page: Number(page),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+module.exports.editReviewBook = async (req, res) => {
+  try {
+    const userId = res.locals.user._id;
+    const { reviewId, text, rating } = req.body;
+    if (!reviewId) return res.status(400).json({ message: "Thiếu reviewId" });
+
+    const review = await ReviewBook.findOne({ _id: reviewId, deleted: false });
+    if (!review)
+      return res.status(404).json({ message: "Không tìm thấy review" });
+    if (String(review.user_id) !== String(userId))
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền sửa review này" });
+
+    if (text !== undefined) review.text = text;
+    if (rating !== undefined) review.rating = rating;
+    await review.save();
+
+    return res.json({ message: "Đã sửa review", data: review });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// Xóa review (xóa mềm)
+module.exports.deleteReviewBook = async (req, res) => {
+  console.log("chạy vào hàm xóa review");
+  try {
+    const userId = res.locals.user._id;
+    const { reviewId } = req.params;
+    if (!reviewId) return res.status(400).json({ message: "Thiếu reviewId" });
+
+    const review = await ReviewBook.findOne({ _id: reviewId, deleted: false });
+    if (!review)
+      return res.status(404).json({ message: "Không tìm thấy review" });
+    if (String(review.user_id) !== String(userId))
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền xóa review này" });
+
+    review.deleted = true;
+    await review.save();
+
+    return res.json({ message: "Đã xóa review" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+const ReviewBookReply = require("./../../model/reviewbookReply");
+module.exports.postreviewReply = async (req, res) => {
+  console.log("đang chạy vào post reply");
+  try {
+    const { text } = req.body;
+    const userId = res.locals.user.id;
+
+    const reply = new ReviewBookReply({
+      review_id: req.params.reviewId,
+      user_id: userId,
+      text,
+    });
+
+    await reply.save();
+    res.status(201).json({ message: "Thêm phản hồi thành công", data: reply });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};
+// lấy tất cả reply
+module.exports.getRepliesByReview = async (req, res) => {
+  console.log("chạy vào tất cả phản hồi");
+  try {
+    const { reviewreplyId } = req.params;
+    console.log("id là : ", reviewreplyId);
+    const replies = await ReviewBookReply.find({
+      review_id: reviewreplyId,
+      deleted: false,
+    })
+      .populate("user_id", "fullname avatar")
+      .sort({ createdAt: 1 });
+
+    res.json({ data: replies });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi server", error: error.message });
+  }
+};
+module.exports.deleteReply = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reply = await ReviewBookReply.findById(id);
+    if (!reply)
+      return res.status(404).json({ message: "Không tìm thấy phản hồi" });
+
+    // Nếu muốn kiểm tra quyền xóa (chỉ chủ nhân được xóa)
+    if (reply.user_id.toString() !== res.locals.user._id.toString()) {
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền xóa phản hồi này" });
+    }
+
+    reply.deleted = true;
+    await reply.save();
+
+    res.json({ message: "Xóa phản hồi thành công" });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi server", error: error.message });
+  }
+};
+module.exports.getLogout = async (req, res) => {
+  console.log("chạy vào logout");
+  try {
+    const users = await user.findById(res.locals.user.id);
+    console.log("user là : ", users);
+    if (!users) return res.status(404).json({ message: "User không tồn tại" });
+
+    // 🔹 Xóa refresh_token trong DB
+    users.refresh_token = null;
+    await users.save();
+    res.json({ message: "Đăng xuất thành công, token đã bị thu hồi" });
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi server" });
   }
 };
