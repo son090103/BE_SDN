@@ -23,6 +23,7 @@
     "yup": "^1.7.1"
   },
   "scripts": {
-    "start": "nodemon --inspect Server.js"
+    "start": "node Server.js",
+    "dev": "nodemon Server.js"
   }
 }
