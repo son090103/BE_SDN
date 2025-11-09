@@ -17,5 +17,12 @@ routerUserNotCheck.get("/category", Usercontroller.getcategory);
 routerUserNotCheck.get("/getauthor", Usercontroller.getauthor);
 routerUserNotCheck.post("/refersh_token", Usercontroller.refersh_token);
 routerUserNotCheck.get("/reviewBook", Usercontroller.getReviewBooks);
-
+// forgot password
+routerUserNotCheck.post("/forgot", Usercontroller.forgot);
+routerUserNotCheck.post("/otp", Usercontroller.getotp);
+// router.post("/resertpassword", controller.resertpassword);
+routerUserNotCheck.post(
+  "/enterresertpassword",
+  Usercontroller.enterresertpassword
+);
 module.exports = routerUserNotCheck;

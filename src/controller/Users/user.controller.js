@@ -16,6 +16,7 @@ const cloudinary = require("../../config/cloudinary");
 const Message = require("../../model/Messages");
 const Conversation = require("../../model/Conversation");
 // lưu ý payload có thể là algorithm (default: HS256) hoặc expiresInMinutes
+
 module.exports.login = async (req, res) => {
   console.log("chạy vào login của user");
   const { email, password } = req.body;
@@ -226,8 +227,8 @@ module.exports.borrowBookFunction = async (req, res) => {
     if (locale === null || locale === "") {
       locale = "vn";
     }
-    console.log("locale: ", locale);
-    console.log("process.env.VNP_HASH_SECRET: ", process.env.VNP_HASH_SECRET);
+    // console.log("locale: ", locale);
+    // console.log("process.env.VNP_HASH_SECRET: ", process.env.VNP_HASH_SECRET);
     const txnRef = uuidv4();
     const returnUrl = `${process.env.VNP_RETURNURL}/${req.body.slug || ""}`;
     let currCode = "VND";
@@ -484,13 +485,12 @@ module.exports.postUserTable = async (req, res) => {
       user_id: res.locals.user._id,
       table_id,
       time_slot: Array.isArray(slot_time) ? slot_time : [slot_time],
-      time_date: start, // lưu ngày chuẩn
+      time_date: start,
       status: "active",
     });
     await userTable.save();
     console.log("✅ Tạo mới lịch:", userTable);
   } else {
-    // Nếu đã có -> push thêm slot_time (tránh trùng lặp)
     const newSlots = Array.isArray(slot_time) ? slot_time : [slot_time];
     userTable.time_slot = Array.from(
       new Set([...userTable.time_slot, ...newSlots])
@@ -503,8 +503,6 @@ module.exports.postUserTable = async (req, res) => {
     table_id: table_id,
     time_date: { $gte: start, $lt: end },
   };
-
-  console.log("query là:", query);
 
   const newuserTable = await User_table.find(query).populate({
     path: "user_id",
@@ -963,14 +961,59 @@ module.exports.getOrderTables = async (req, res) => {
   }
 };
 const ReviewBook = require("./../../model/Review_book");
+const axios = require("axios");
+
+const ANALYZE_URL = process.env.ANALYZE_URL;
+const KEY = process.env.API_KEY;
+
 module.exports.addReviewBook = async (req, res) => {
-  console.log("đang chạy vào thêm review ");
+  console.log("➡️ Đang chạy vào thêm review (có kiểm duyệt AI)...");
   try {
     const userId = res.locals.user._id;
     const { bookId, text, rating } = req.body;
+
     if (!bookId || !text || typeof rating !== "number") {
       return res.status(400).json({ message: "Thiếu thông tin đánh giá" });
     }
+
+    // 🔹 Gọi API phân tích đầy đủ (Full Mode)
+    const aiResponse = await axios.post(
+      ANALYZE_URL,
+      {
+        text,
+        detail_level: "full",
+        modes: ["sentiment", "toxicity", "emotion", "aspects"],
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "x-rapidapi-host":
+            "ai-text-moderation-toxicity-aspects-sentiment-analyzer.p.rapidapi.com",
+          "x-rapidapi-key": KEY,
+        },
+      }
+    );
+
+    const result = aiResponse.data?.data?.items?.[0];
+    if (!result) throw new Error("Không nhận được phản hồi từ API.");
+
+    const tox = result.toxicity?.overall || 0;
+    const insult = result.toxicity?.dimensions?.insults_and_bullying || 0;
+    console.log("kết quả result của AI là : ", result);
+    // 🔹 Logic custom: nếu mức độc hại > 0.7 thì chặn
+    if (tox > 0.7 || insult > 0.7) {
+      return res.status(403).json({
+        message: "⚠️ Bình luận bị chặn do chứa ngôn từ xúc phạm hoặc tiêu cực.",
+        details: {
+          toxicity_overall: tox,
+          insults_and_bullying: insult,
+          sentiment: result.sentiment,
+          emotion: result.emotion.top,
+        },
+      });
+    }
+
+    // 🔹 Nếu an toàn → lưu bình luận
     const review = new ReviewBook({
       user_id: userId,
       book_id: bookId,
@@ -978,18 +1021,49 @@ module.exports.addReviewBook = async (req, res) => {
       rating,
     });
     await review.save();
-    // Populate user info khi trả về
+
     const populatedReview = await ReviewBook.findById(review._id).populate({
       path: "user_id",
       select: "fullname avatar _id",
     });
-    return res
-      .status(201)
-      .json({ message: "Đánh giá thành công", data: populatedReview });
+
+    return res.status(201).json({
+      message: "✅ Đánh giá thành công (đã kiểm duyệt)",
+      data: populatedReview,
+    });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error("❌ Lỗi khi thêm review:", err.message);
+    return res.status(500).json({ message: "Lỗi server: " + err.message });
   }
 };
+
+// module.exports.addReviewBook = async (req, res) => {
+//   console.log("đang chạy vào thêm review ");
+//   try {
+//     const userId = res.locals.user._id;
+//     const { bookId, text, rating } = req.body;
+//     if (!bookId || !text || typeof rating !== "number") {
+//       return res.status(400).json({ message: "Thiếu thông tin đánh giá" });
+//     }
+//     const review = new ReviewBook({
+//       user_id: userId,
+//       book_id: bookId,
+//       text,
+//       rating,
+//     });
+//     await review.save();
+//     // Populate user info khi trả về
+//     const populatedReview = await ReviewBook.findById(review._id).populate({
+//       path: "user_id",
+//       select: "fullname avatar _id",
+//     });
+//     return res
+//       .status(201)
+//       .json({ message: "Đánh giá thành công", data: populatedReview });
+//   } catch (err) {
+//     return res.status(500).json({ message: err.message });
+//   }
+// };
 
 // Lấy review theo book
 
@@ -1141,4 +1215,168 @@ module.exports.getLogout = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: "Lỗi server" });
   }
+};
+module.exports.chatboxAI = async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    // ✅ Kiểm tra input
+    if (!message || message.trim() === "") {
+      return res.status(400).json({ error: "Message is required." });
+    }
+
+    // ✅ Gửi request sang Flask AI Service
+    const flaskRes = await axios.post("http://127.0.0.1:6000/api/chat", {
+      message,
+    });
+
+    const { intent, reply_type, reply } = flaskRes.data;
+
+    // ✅ Trả kết quả lại cho frontend React
+    return res.status(200).json({
+      success: true,
+      intent,
+      reply_type, // 🟩 rất quan trọng cho frontend phân biệt "text" hay "books"
+      reply,
+    });
+  } catch (error) {
+    console.error("❌ Error connecting to Flask AI service:", error.message);
+
+    // Nếu Flask có trả về phản hồi lỗi
+    if (error.response && error.response.data) {
+      return res.status(error.response.status || 500).json({
+        success: false,
+        error: error.response.data.error || "Flask returned an error.",
+        details: error.response.data.details || null,
+      });
+    }
+
+    // Nếu không có phản hồi từ Flask
+    return res.status(500).json({
+      success: false,
+      error: "AI service unavailable. Please try again later.",
+    });
+  }
+};
+const forgot = require("./../../model/forgots");
+const generater = require("./../../utils/generater");
+const { object, string } = require("yup");
+const sendMailHepler = require("./../../utils/sendEmail");
+module.exports.forgot = async (req, res) => {
+  //
+  const { email } = req.body; // phá vỡ cấu trúc
+  console.log("email trong body là : ", email);
+  const response = {};
+  // validate lại dữ liệu
+  let usersschma = object({
+    email: string()
+      .required("Bắt buộc phải nhập email")
+      .email("bắt buộc phải nhập đúng định dạng email"),
+  });
+  try {
+    const body = await usersschma.validate(req.body, { abortEarly: false });
+    const users = await user.findOne({
+      email: email,
+      status: "active",
+      deleted: false,
+    });
+    console.log("user trong forgot là : ", users);
+    if (!users) {
+      throw new Error("user not exsit ");
+    }
+    const forgotSchema = {
+      email: email,
+      otp: generater.generateRandomString(8),
+      expireAt: Date.now(),
+    };
+    const forgots = new forgot(forgotSchema);
+    await forgots.save();
+    const subject = "Mã OTP để xác nhận để lấy lại mật khẩu";
+    const htmlcontent = `Mã otp xác minh để lấy lại mật khẩu là :${forgotSchema.otp} , lưu ý thời hạn trong vòng 3 phút`;
+    sendMailHepler.sendmail(email, subject, htmlcontent);
+    Object.assign(response, {
+      state: 200,
+      message: "success",
+    });
+  } catch (e) {
+    let error = {};
+    if (e.name === "ValidationError" && Array.isArray(e.inner)) {
+      error = Object.fromEntries(
+        e.inner.map((item) => [item.path, item.message])
+      );
+    } else {
+      error = { general: e.message };
+    }
+    Object.assign(response, {
+      state: 404,
+      message: "Bad request",
+      error,
+    });
+  }
+  return res.status(response.state).json(response);
+};
+module.exports.getotp = async (req, res) => {
+  const response = {};
+  const forgots = await forgot.findOne({ email: req.body.email });
+  console.log("req là: ", forgots);
+  console.log("otp là : ", req.body.otp);
+  if (forgots) {
+    if (req.body.otp != forgots.otp) {
+      console.log("không ok");
+      Object.assign(response, {
+        status: 500,
+        message: "Serrver error",
+      });
+    } else {
+      console.log("quá  ok");
+      await user.updateOne({ email: req.body.email }, { resertpassword: true }); // update để có thể đổi mật khẩu
+      // if (!users) {
+      //   throw new Error("users not exsit");
+      // }
+      // await users.updateOne({ password: password, resertpassword: false });
+      Object.assign(response, {
+        status: 200,
+        message: "success",
+      });
+    }
+  } else {
+    console.log("server bị lỗi");
+    Object.assign(response, {
+      status: 500,
+      message: "Serrver error",
+    });
+  }
+  return res.status(response.status).json(response);
+};
+module.exports.enterresertpassword = async (req, res) => {
+  var { email, password } = req.body;
+  console.log("email trong chương trình là : ", req.body);
+  password = bcrypt.hashSync(password, 10);
+  const response = {};
+  try {
+    console.log("chạy vào try");
+    const users1 = await user.findOne({ email: email });
+    console.log("dữ liệu thử là ", users1);
+    const users = await user.findOne({ email: email, resertpassword: true });
+    console.log("user trong chương trình trên là : ", users);
+    if (!users) {
+      Object.assign(response, {
+        state: 404,
+        message: "not found",
+      });
+      return res.status(response.state).json(response);
+    }
+    await users.updateOne({ password: password, resertpassword: false });
+    Object.assign(response, {
+      state: 200,
+      message: "success",
+    });
+  } catch (e) {
+    console.log("chạy vào catch");
+    Object.assign(response, {
+      state: 400,
+      message: "Bad request",
+    });
+  }
+  return res.status(response.state).json(response);
 };

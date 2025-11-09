@@ -6,7 +6,8 @@ module.exports.getBookBySlug = async (req, res) => {
       slug: req.params.slug,
       deleted: false,
       status: "active",
-    });
+    }).populate("authors");
+    console.log("book là : ", book);
     if (!book) return res.status(404).json({ message: "Book not found" });
     res.json(book);
   } catch (err) {

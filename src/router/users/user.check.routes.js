@@ -40,4 +40,6 @@ routerUserCheck.get("/:reviewreplyId", userController.getRepliesByReview);
 // Xóa phản hồi
 routerUserCheck.delete("/:id", userController.deleteReply);
 routerUserCheck.post("/logout", userController.getLogout);
+
+routerUserCheck.post("/chatboxAI", userController.chatboxAI);
 module.exports = routerUserCheck;

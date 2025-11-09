@@ -9,9 +9,9 @@ const whitelist = [
   "http://localhost:3000",
   "http://localhost:5173",
   // cảu mobile bên dưới
-  "http://192.168.0.16",
-  "http://192.168.0.16:8081", // Expo web
-  "http://192.168.0.16:19000", // Expo Go (port ngẫu nhiên)
+  "http://192.168.0.20",
+  "http://192.168.0.20:8081", // Expo web
+  "http://192.168.0.20:19000", // Expo Go (port ngẫu nhiên)
 ];
 const http = require("http");
 const server = http.createServer(app);
