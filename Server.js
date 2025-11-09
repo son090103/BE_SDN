@@ -52,6 +52,6 @@ librarianRouterCheck(app);
 adminRouterCheck(app);
 database.connect();
 initWebSocket(server);
-server.listen(port, () => {
+app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
