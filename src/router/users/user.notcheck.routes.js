@@ -25,4 +25,12 @@ routerUserNotCheck.post(
   "/enterresertpassword",
   Usercontroller.enterresertpassword
 );
+routerUserNotCheck.get(
+  "/vnpay-borrowBook",
+  Usercontroller.vnpayborrowBookFunction
+);
+routerUserNotCheck.get(
+  "/vnpay-borrowTable",
+  Usercontroller.vnpayUserTableCallback
+);
 module.exports = routerUserNotCheck;

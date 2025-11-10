@@ -3,6 +3,7 @@ const routerUserCheck = express.Router();
 const userController = require("../../controller/Users/user.controller");
 const upload = require("../../utils/upload");
 routerUserCheck.post("/borrowBook", userController.borrowBookFunction);
+
 routerUserCheck.get("/getuser", userController.getUser);
 routerUserCheck.get("/slottime", userController.getslotTime);
 routerUserCheck.get("/getTable", userController.getTables);
@@ -16,6 +17,7 @@ routerUserCheck.put(
 routerUserCheck.put("/profile/password", userController.changePassword);
 //send message
 routerUserCheck.post("/sendMessage", userController.sendMessage);
+
 routerUserCheck.get("/messageHistory", userController.getMessageHistory);
 // Fav book
 routerUserCheck.get("/favourite", userController.getFavouriteBooks);

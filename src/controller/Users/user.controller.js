@@ -12,11 +12,9 @@ const Table = require("../../model/Table");
 const User_table = require("../../model/User_table");
 const FaouriteBook = require("../../model/FaouriteBook");
 const cloudinary = require("../../config/cloudinary");
-
 const Message = require("../../model/Messages");
 const Conversation = require("../../model/Conversation");
 // lưu ý payload có thể là algorithm (default: HS256) hoặc expiresInMinutes
-
 module.exports.login = async (req, res) => {
   console.log("chạy vào login của user");
   const { email, password } = req.body;
@@ -174,16 +172,146 @@ let crypto = require("crypto");
 const moment = require("moment");
 const os = require("os");
 const { sendToUser } = require("../../config/websocket");
+// module.exports.borrowBookFunction = async (req, res) => {
+//   console.log("📚 Chạy vào borrowBookFunction");
+
+//   try {
+//     // 🧩 1. Lấy dữ liệu từ request
+//     const { bookId, quantityInput, slug } = req.body;
+//     console.log("dữ liệu về là : ", bookId, quantityInput, slug);
+//     const book = await Book.findById(bookId);
+//     const userId = res.locals.user?.id;
+
+//     if (!book) {
+//       return res.status(404).json({ message: "❌ Không tìm thấy sách." });
+//     }
+//     if (book.quantity <= 0) {
+//       return res.status(400).json({ message: "❌ Sách này đã hết hàng." });
+//     }
+//     if (book.quantity < quantityInput) {
+//       return res.status(400).json({
+//         message: `⚠️ Chỉ còn ${book.quantity} cuốn trong kho, không thể mượn ${quantityInput} cuốn.`,
+//       });
+//     }
+//     if (!userId) {
+//       return res
+//         .status(400)
+//         .json({ message: "Thiếu user_id (token không hợp lệ)." });
+//     }
+//     let amount = 0;
+//     // 🧩 2. Tính tổng tiền
+//     amount = Number(book.price) * Number(quantityInput);
+//     console.log("💰 amount:", amount, "| kiểu:", typeof amount);
+
+//     let date = new Date();
+//     let createDate = moment(date).format("YYYYMMDDHHmmss");
+//     function getLocalIpAddress() {
+//       const interfaces = os.networkInterfaces();
+
+//       for (const name of Object.keys(interfaces)) {
+//         for (const iface of interfaces[name]) {
+//           // Bỏ qua địa chỉ nội bộ (127.0.0.1) và địa chỉ IPv6
+//           if (iface.family === "IPv4" && !iface.internal) {
+//             return iface.address;
+//           }
+//         }
+//       }
+
+//       return "127.0.0.1"; // fallback nếu không có IP nào phù hợp
+//     }
+
+//     const clientIp = getLocalIpAddress();
+//     let locale = req.body.language;
+//     if (locale === null || locale === "") {
+//       locale = "vn";
+//     }
+//     // console.log("locale: ", locale);
+//     // console.log("process.env.VNP_HASH_SECRET: ", process.env.VNP_HASH_SECRET);
+//     const txnRef = uuidv4();
+//     const returnUrl = `${process.env.VNP_RETURNURL}/${req.body.slug || ""}`;
+//     let currCode = "VND";
+//     let vnp_Params = {};
+//     vnp_Params["vnp_Version"] = "2.1.0";
+//     vnp_Params["vnp_Command"] = "pay";
+//     vnp_Params["vnp_TmnCode"] = process.env.VNP_TMNCODE;
+//     vnp_Params["vnp_Locale"] = "vn";
+//     vnp_Params["vnp_CurrCode"] = currCode;
+//     vnp_Params["vnp_TxnRef"] = txnRef;
+//     vnp_Params["vnp_OrderInfo"] = `${userId}`;
+//     vnp_Params["vnp_OrderType"] = "other";
+//     vnp_Params["vnp_Amount"] = amount * 100;
+//     vnp_Params["vnp_ReturnUrl"] = encodeURIComponent(returnUrl);
+//     vnp_Params["vnp_IpAddr"] = clientIp;
+//     vnp_Params["vnp_CreateDate"] = createDate;
+//     // Optional bankCode nếu có
+//     let bankCode = req.body.bankCode;
+//     if (bankCode !== null && bankCode !== "") {
+//       vnp_Params["vnp_BankCode"] = bankCode;
+//     }
+//     let querystring = require("qs");
+//     // let vnpUrl = process.env.VNP_PAYURL;
+//     const sortedParams = Object.keys(vnp_Params)
+//       .sort()
+//       .reduce((obj, key) => {
+//         obj[key] = vnp_Params[key];
+//         return obj;
+//       }, {});
+
+//     // Tạo vnp_SecureHash với SHA-256
+//     const signData = querystring.stringify(sortedParams, { encode: false });
+//     const hmac = crypto.createHmac("sha512", process.env.VNP_HASH_SECRET);
+//     const signed = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
+//     vnp_Params["vnp_SecureHash"] = signed;
+
+//     // Tạo URL thanh toán
+//     const vnpUrl =
+//       process.env.VNP_PAYURL +
+//       "?" +
+//       querystring.stringify(vnp_Params, { encode: false });
+//     console.log("signData:", signData);
+//     console.log("vnp_SecureHash:", vnp_Params["vnp_SecureHash"]);
+//     console.log("vnp_Params:", vnp_Params);
+//     console.log("vnpUrl:", vnpUrl);
+//     // 🧩 9. Lưu thông tin mượn sách
+//     const userBook = new UserBook({
+//       user_id: res.locals.user._id,
+//       book_id: bookId,
+//       quantity: quantityInput,
+//       borrow_date: new Date(),
+//       book_detail: {
+//         price: amount,
+//         date: new Date(),
+//         transaction_type: "Booking_book",
+//       },
+//     });
+//     await userBook.save();
+
+//     // Giảm số lượng trong kho
+//     book.quantity -= Number(quantityInput);
+//     await book.save();
+
+//     // 🧩 10. Trả về URL thanh toán cho FE
+//     res.status(200).json({
+//       success: true,
+//       message: "Tạo yêu cầu mượn sách và thanh toán thành công!",
+//       url: vnpUrl,
+//     });
+//   } catch (err) {
+//     console.error("🚨 Lỗi trong borrowBookFunction:", err);
+//     res.status(500).json({ message: err.message });
+//   }
+// };
+//
+// mượn sách check
 module.exports.borrowBookFunction = async (req, res) => {
   console.log("📚 Chạy vào borrowBookFunction");
-
   try {
     // 🧩 1. Lấy dữ liệu từ request
     const { bookId, quantityInput, slug } = req.body;
     console.log("dữ liệu về là : ", bookId, quantityInput, slug);
     const book = await Book.findById(bookId);
-    const userId = res.locals.user?.id;
 
+    const userId = res.locals.user?.id;
     if (!book) {
       return res.status(404).json({ message: "❌ Không tìm thấy sách." });
     }
@@ -200,16 +328,26 @@ module.exports.borrowBookFunction = async (req, res) => {
         .status(400)
         .json({ message: "Thiếu user_id (token không hợp lệ)." });
     }
+    const orderPayload = {
+      userId,
+      bookId,
+      quantity: quantityInput,
+      slug,
+    };
+    const orderInfo = Buffer.from(JSON.stringify(orderPayload), "utf8")
+      .toString("base64")
+      .replace(/\+/g, "-") // URL-safe
+      .replace(/\//g, "_") // URL-safe
+      .replace(/=+$/, ""); // bỏ padding
+
     let amount = 0;
     // 🧩 2. Tính tổng tiền
     amount = Number(book.price) * Number(quantityInput);
     console.log("💰 amount:", amount, "| kiểu:", typeof amount);
-
     let date = new Date();
     let createDate = moment(date).format("YYYYMMDDHHmmss");
     function getLocalIpAddress() {
       const interfaces = os.networkInterfaces();
-
       for (const name of Object.keys(interfaces)) {
         for (const iface of interfaces[name]) {
           // Bỏ qua địa chỉ nội bộ (127.0.0.1) và địa chỉ IPv6
@@ -218,10 +356,8 @@ module.exports.borrowBookFunction = async (req, res) => {
           }
         }
       }
-
       return "127.0.0.1"; // fallback nếu không có IP nào phù hợp
     }
-
     const clientIp = getLocalIpAddress();
     let locale = req.body.language;
     if (locale === null || locale === "") {
@@ -230,7 +366,8 @@ module.exports.borrowBookFunction = async (req, res) => {
     // console.log("locale: ", locale);
     // console.log("process.env.VNP_HASH_SECRET: ", process.env.VNP_HASH_SECRET);
     const txnRef = uuidv4();
-    const returnUrl = `${process.env.VNP_RETURNURL}/${req.body.slug || ""}`;
+    // const returnUrl = `${process.env.VNP_RETURNURL}/${req.body.slug || ""}`;
+    const returnUrl = `${process.env.RETURNURL}`;
     let currCode = "VND";
     let vnp_Params = {};
     vnp_Params["vnp_Version"] = "2.1.0";
@@ -239,7 +376,7 @@ module.exports.borrowBookFunction = async (req, res) => {
     vnp_Params["vnp_Locale"] = "vn";
     vnp_Params["vnp_CurrCode"] = currCode;
     vnp_Params["vnp_TxnRef"] = txnRef;
-    vnp_Params["vnp_OrderInfo"] = `${userId}`;
+    vnp_Params["vnp_OrderInfo"] = `${orderInfo}`;
     vnp_Params["vnp_OrderType"] = "other";
     vnp_Params["vnp_Amount"] = amount * 100;
     vnp_Params["vnp_ReturnUrl"] = encodeURIComponent(returnUrl);
@@ -258,48 +395,130 @@ module.exports.borrowBookFunction = async (req, res) => {
         obj[key] = vnp_Params[key];
         return obj;
       }, {});
-
     // Tạo vnp_SecureHash với SHA-256
     const signData = querystring.stringify(sortedParams, { encode: false });
     const hmac = crypto.createHmac("sha512", process.env.VNP_HASH_SECRET);
     const signed = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
     vnp_Params["vnp_SecureHash"] = signed;
-
     // Tạo URL thanh toán
     const vnpUrl =
       process.env.VNP_PAYURL +
       "?" +
       querystring.stringify(vnp_Params, { encode: false });
-    console.log("signData:", signData);
-    console.log("vnp_SecureHash:", vnp_Params["vnp_SecureHash"]);
-    console.log("vnp_Params:", vnp_Params);
-    console.log("vnpUrl:", vnpUrl);
-    // 🧩 9. Lưu thông tin mượn sách
-    const userBook = new UserBook({
-      user_id: res.locals.user._id,
-      book_id: bookId,
-      quantity: quantityInput,
-      borrow_date: new Date(),
-      book_detail: {
-        price: amount,
-        date: new Date(),
-        transaction_type: "Booking_book",
-      },
-    });
-    await userBook.save();
-
-    // Giảm số lượng trong kho
-    book.quantity -= Number(quantityInput);
-    await book.save();
-
-    // 🧩 10. Trả về URL thanh toán cho FE
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Tạo yêu cầu mượn sách và thanh toán thành công!",
+      message: "Tạo URL thanh toán thành công!",
       url: vnpUrl,
+      slug: slug,
+      bookId,
+      quantityInput,
     });
   } catch (err) {
     console.error("🚨 Lỗi trong borrowBookFunction:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+module.exports.vnpayborrowBookFunction = async (req, res) => {
+  console.log("chạy vào trả lại vnpay");
+  try {
+    console.log("body ;là :", req.body);
+    console.log("🏦 Callback VNPay:", req.query);
+    const vnp_Params = { ...req.query };
+    let decodedInfo = {};
+    try {
+      const rawOrderInfo = vnp_Params.vnp_OrderInfo || "";
+
+      // decode base64 (nếu bạn encode theo chuẩn Base64)
+      const jsonStr = Buffer.from(rawOrderInfo, "base64").toString("utf8");
+
+      // parse sang object
+      decodedInfo = JSON.parse(jsonStr);
+    } catch (err) {
+      console.error("❌ Không thể decode vnp_OrderInfo:", err);
+    }
+
+    // Destructure từ object sau khi decode
+    const { slug, bookId, quantity: quantityInput, userId } = decodedInfo || {};
+    console.log("📦 Dữ liệu giải mã từ vnp_OrderInfo:", {
+      userId,
+      bookId,
+      quantityInput,
+      slug,
+    });
+    const secureHash = vnp_Params["vnp_SecureHash"];
+    delete vnp_Params["vnp_SecureHash"];
+    delete vnp_Params["vnp_SecureHashType"];
+
+    const sortedParams = Object.keys(vnp_Params)
+      .sort()
+      .reduce((obj, key) => {
+        obj[key] = vnp_Params[key];
+        return obj;
+      }, {});
+    let qs = require("qs");
+    const signData = qs.stringify(sortedParams, { encode: false });
+    const signed = crypto
+      .createHmac("sha512", process.env.VNP_HASH_SECRET)
+      .update(Buffer.from(signData, "utf-8"))
+      .digest("hex");
+
+    if (secureHash !== signed) {
+      return res.status(400).json({ message: "❌ Sai chữ ký VNPay" });
+    }
+
+    // ✅ Chỉ xử lý khi thanh toán thành công
+    if (vnp_Params["vnp_ResponseCode"] === "00") {
+      // ❌ Đừng làm thế này nữa
+      // const [userId] = vnp_Params["vnp_OrderInfo"];
+
+      // ✅ Dùng userId đã decode từ base64 JSON ở trên
+      const { userId, bookId, quantity: quantityInput, slug } = decodedInfo;
+
+      const amount = Number(vnp_Params["vnp_Amount"]) / 100;
+      const quantity = quantityInput;
+
+      const book = await Book.findById(bookId);
+      if (!book) {
+        return res.status(404).json({ message: "Không tìm thấy sách." });
+      }
+
+      if (book.quantity < quantity) {
+        return res.status(400).json({ message: "Sách không đủ số lượng." });
+      }
+
+      // 🧩 Lưu vào DB
+      const userBook = new UserBook({
+        user_id: userId, // ✅ đúng giá trị ObjectId
+        book_id: bookId,
+        quantity: quantity,
+        borrow_date: new Date(),
+        book_detail: {
+          price: amount,
+          date: new Date(),
+          transaction_type: "Booking_book",
+          txnRef: vnp_Params["vnp_TxnRef"],
+        },
+      });
+      await userBook.save();
+
+      // 🧩 Trừ số lượng sách
+      book.quantity -= Number(quantity);
+      await book.save();
+
+      console.log("✅ Thanh toán thành công cho user:", userId);
+
+      // tạo url
+      const returnUrl = `${process.env.VNP_RETURNURL}/${slug || ""}`;
+      return res.redirect(
+        `${returnUrl}?status=success&txnRef=${vnp_Params["vnp_TxnRef"]}`
+      );
+    } else {
+      return res.redirect(
+        `${process.env.FRONTEND_FAIL_PAGE}?status=fail&code=${vnp_Params["vnp_ResponseCode"]}`
+      );
+    }
+  } catch (err) {
+    console.error("🚨 Lỗi VNPay callback:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -465,56 +684,261 @@ module.exports.getUserTable = async (req, res) => {
 };
 
 // đặt bàn
+// module.exports.postUserTable = async (req, res) => {
+//   const { table_id, time_date, slot_time } = req.body;
+//   console.log("req.body là : ", table_id, time_date, slot_time);
+
+//   const [year, month, day] = time_date.split("-").map(Number);
+
+//   const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+//   const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+
+//   let userTable = await User_table.findOne({
+//     user_id: res.locals.user.id,
+//     table_id: table_id,
+//     time_date: { $gte: start, $lt: end },
+//   });
+//   console.log("user là : ", res.locals._id);
+//   if (!userTable) {
+//     userTable = new User_table({
+//       user_id: res.locals.user._id,
+//       table_id,
+//       time_slot: Array.isArray(slot_time) ? slot_time : [slot_time],
+//       time_date: start,
+//       status: "active",
+//     });
+//     await userTable.save();
+//     console.log("✅ Tạo mới lịch:", userTable);
+//   } else {
+//     const newSlots = Array.isArray(slot_time) ? slot_time : [slot_time];
+//     userTable.time_slot = Array.from(
+//       new Set([...userTable.time_slot, ...newSlots])
+//     );
+//     await userTable.save();
+//     console.log("✅ Cập nhật slot_time:", userTable);
+//   }
+//   const query = {
+//     status: "active",
+//     table_id: table_id,
+//     time_date: { $gte: start, $lt: end },
+//   };
+
+//   const newuserTable = await User_table.find(query).populate({
+//     path: "user_id",
+//     select: "-password",
+//   });
+//   return res.status(200).json({
+//     status: 200,
+//     message: "success",
+//     data: newuserTable,
+//   });
+// };
 module.exports.postUserTable = async (req, res) => {
-  const { table_id, time_date, slot_time } = req.body;
-  console.log("req.body là : ", table_id, time_date, slot_time);
+  console.log("Chạy vào postUserTableVNPay");
+  try {
+    const { table_id, time_date, slot_time, language, bankCode } = req.body;
+    const userId = res.locals.user?._id;
 
-  const [year, month, day] = time_date.split("-").map(Number);
+    if (!userId)
+      return res
+        .status(400)
+        .json({ message: "Thiếu user_id (token không hợp lệ)." });
+    if (!table_id || !time_date || !slot_time)
+      return res.status(400).json({ message: "Thiếu tham số đầu vào." });
 
-  const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-  const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    const table = await Table.findById(table_id);
+    if (!table) return res.status(404).json({ message: "Không tìm thấy bàn." });
 
-  let userTable = await User_table.findOne({
-    user_id: res.locals.user.id,
-    table_id: table_id,
-    time_date: { $gte: start, $lt: end },
-  });
-  console.log("user là : ", res.locals._id);
-  if (!userTable) {
-    userTable = new User_table({
-      user_id: res.locals.user._id,
+    const pricePerSlot = Number(table.price);
+    const quantity = Array.isArray(slot_time) ? slot_time.length : 1;
+    const amount = pricePerSlot * quantity;
+
+    const orderPayload = { userId, table_id, time_date, slot_time, quantity };
+    const orderInfo = Buffer.from(JSON.stringify(orderPayload), "utf8")
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    const txnRef = uuidv4();
+    const createDate = moment(new Date()).format("YYYYMMDDHHmmss");
+
+    function getLocalIpAddress() {
+      const interfaces = os.networkInterfaces();
+      for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+          if (iface.family === "IPv4" && !iface.internal) return iface.address;
+        }
+      }
+      return "127.0.0.1";
+    }
+    const clientIp = getLocalIpAddress();
+    const locale = language || "vn";
+
+    // QUAN TRỌNG: encodeURIComponent TRƯỚC khi đưa vào params
+    // Thay đoạn này:
+    const returnUrl = process.env.RETURNURLTable;
+
+    // Thành:
+    const returnUrlRaw = process.env.RETURNURLTable;
+    const returnUrlEncoded = encodeURIComponent(returnUrlRaw); // encode trước
+
+    let vnp_Params = {
+      vnp_Version: "2.1.0",
+      vnp_Command: "pay",
+      vnp_TmnCode: process.env.VNP_TMNCODE,
+      vnp_Locale: locale,
+      vnp_CurrCode: "VND",
+      vnp_TxnRef: txnRef,
+      vnp_OrderInfo: orderInfo,
+      vnp_OrderType: "other",
+      vnp_Amount: amount * 100,
+      vnp_ReturnUrl: returnUrlEncoded, // đã encode
+      vnp_IpAddr: clientIp,
+      vnp_CreateDate: createDate,
+    };
+
+    let qs = require("qs");
+
+    const sortedParams = Object.keys(vnp_Params)
+      .sort()
+      .reduce((obj, key) => {
+        obj[key] = vnp_Params[key];
+        return obj;
+      }, {});
+
+    const signData = qs.stringify(sortedParams, { encode: false }); // không encode
+    const signed = crypto
+      .createHmac("sha512", process.env.VNP_HASH_SECRET)
+      .update(Buffer.from(signData, "utf-8"))
+      .digest("hex");
+
+    vnp_Params.vnp_SecureHash = signed;
+
+    // TẠO URL: KHÔNG DÙNG { encode: true } → tránh double encode
+    const vnpUrl =
+      process.env.VNP_PAYURL +
+      "?" +
+      qs.stringify(vnp_Params, { encode: false });
+
+    console.log("signData:", signData);
+    console.log("vnpUrl:", vnpUrl);
+
+    return res.status(200).json({
+      success: true,
+      message: "Tạo URL thanh toán thành công!",
+      url: vnpUrl,
       table_id,
-      time_slot: Array.isArray(slot_time) ? slot_time : [slot_time],
-      time_date: start,
-      status: "active",
+      time_date,
+      slot_time,
     });
-    await userTable.save();
-    console.log("✅ Tạo mới lịch:", userTable);
-  } else {
-    const newSlots = Array.isArray(slot_time) ? slot_time : [slot_time];
-    userTable.time_slot = Array.from(
-      new Set([...userTable.time_slot, ...newSlots])
-    );
-    await userTable.save();
-    console.log("✅ Cập nhật slot_time:", userTable);
+  } catch (err) {
+    console.error("Lỗi trong postUserTableVNPay:", err);
+    res.status(500).json({ message: err.message });
   }
-  const query = {
-    status: "active",
-    table_id: table_id,
-    time_date: { $gte: start, $lt: end },
-  };
-
-  const newuserTable = await User_table.find(query).populate({
-    path: "user_id",
-    select: "-password",
-  });
-  return res.status(200).json({
-    status: 200,
-    message: "success",
-    data: newuserTable,
-  });
 };
 
+// router return chạy đến
+module.exports.vnpayUserTableCallback = async (req, res) => {
+  console.log("🏦 Callback VNPay User Table:", req.query);
+  try {
+    const vnp_Params = { ...req.query };
+    const secureHash = vnp_Params["vnp_SecureHash"];
+    delete vnp_Params["vnp_SecureHash"];
+    delete vnp_Params["vnp_SecureHashType"];
+
+    // 🔒 Verify chữ ký
+    const qs = require("qs");
+    const signData = qs.stringify(
+      Object.keys(vnp_Params)
+        .sort()
+        .reduce((obj, k) => ((obj[k] = vnp_Params[k]), obj), {}),
+      { encode: false }
+    );
+    const signed = crypto
+      .createHmac("sha512", process.env.VNP_HASH_SECRET)
+      .update(Buffer.from(signData, "utf-8"))
+      .digest("hex");
+
+    if (secureHash !== signed) {
+      return res.status(400).json({ message: "❌ Sai chữ ký VNPay" });
+    }
+
+    // ✅ Chỉ xử lý khi thanh toán thành công
+    if (vnp_Params["vnp_ResponseCode"] === "00") {
+      // ✅ Decode thông tin đặt bàn từ OrderInfo
+      let decodedJson = "";
+      try {
+        decodedJson = Buffer.from(vnp_Params.vnp_OrderInfo, "base64").toString(
+          "utf8"
+        );
+      } catch (err) {
+        console.error("❌ Không thể decode vnp_OrderInfo:", err);
+        return res.status(400).json({ message: "Lỗi giải mã OrderInfo" });
+      }
+
+      const { userId, table_id, time_date, slot_time } = JSON.parse(
+        decodedJson || "{}"
+      );
+
+      // 🧩 Tính khoảng thời gian trong ngày
+      const [year, month, day] = time_date.split("-").map(Number);
+      const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+      const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+
+      // ✅ Kiểm tra lịch cũ
+      let userTable = await User_table.findOne({
+        user_id: userId,
+        table_id: table_id,
+        time_date: { $gte: start, $lt: end },
+      });
+
+      if (!userTable) {
+        userTable = new User_table({
+          user_id: userId,
+          table_id,
+          time_slot: Array.isArray(slot_time) ? slot_time : [slot_time],
+          time_date: start,
+          status: "active",
+          paid: true,
+          payment_info: {
+            txnRef: vnp_Params["vnp_TxnRef"],
+            date: new Date(),
+          },
+        });
+        await userTable.save();
+        console.log("✅ Tạo mới lịch đặt bàn:", userTable);
+      } else {
+        const newSlots = Array.isArray(slot_time) ? slot_time : [slot_time];
+        userTable.time_slot = Array.from(
+          new Set([...userTable.time_slot, ...newSlots])
+        );
+        await userTable.save();
+        console.log("✅ Cập nhật slot_time:", userTable);
+      }
+
+      // ✅ Tạo URL redirect về FE
+      const returnUrl = `http://localhost:5173/bookingtable`;
+
+      // encode query param để tránh lỗi ký tự đặc biệt
+      const redirectUrl = `${returnUrl}?status=success&type=table&table=${encodeURIComponent(
+        table_id
+      )}&date=${encodeURIComponent(time_date)}&txnRef=${encodeURIComponent(
+        vnp_Params["vnp_TxnRef"]
+      )}`;
+
+      console.log("🌐 Redirect về FE:", redirectUrl);
+      return res.redirect(redirectUrl);
+    } else {
+      const failUrl = `http://localhost:5173/bookingtable?status=fail&code=${vnp_Params["vnp_ResponseCode"]}`;
+      console.warn("❌ Thanh toán thất bại:", failUrl);
+      return res.redirect(failUrl);
+    }
+  } catch (err) {
+    console.error("🚨 Lỗi VNPay callback (UserTable):", err);
+    res.status(500).json({ message: err.message });
+  }
+};
 module.exports.updateProfile = async (req, res) => {
   try {
     const me = await user.findById(res.locals.user._id);

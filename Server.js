@@ -12,7 +12,6 @@ const whitelist = [
   "http://192.168.0.20",
   "http://192.168.0.20:8081", // Expo web
   "http://192.168.0.20:19000", // Expo Go (port ngẫu nhiên)
-  "https://be-sdn-f82h.vercel.app/",
 ];
 // const http = require("http");
 // const server = http.createServer(app);
@@ -52,7 +51,7 @@ librarianRouterCheck(app);
 adminRouterCheck(app);
 database.connect();
 // initWebSocket(server);
-// app.listen(port, () => {
+// server.listen(port, () => {
 //   console.log(`Example app listening on port ${port}`);
 // });
 module.exports = app;
